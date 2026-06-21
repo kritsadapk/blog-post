@@ -2,7 +2,7 @@
 title: "สร้าง AI Chatbot ด้วย Node.js และ OpenAI API"
 date: "2026-06-21"
 category: "javascript"
-image: "/posts/1_qT25TPSPtov_LFjTYcjM2A.webp"
+image: "https://pixelplex.io/next/images/chatbot-development/header/chatbot-development-bg-1600.jpg"
 imageAlt: "woman doing yoga meditation on brown parquet flooring"
 ---
 # สร้าง AI Chatbot ด้วย Node.js และ OpenAI API
