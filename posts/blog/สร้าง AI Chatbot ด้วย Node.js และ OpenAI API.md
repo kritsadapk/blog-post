@@ -52,7 +52,7 @@ npm init -y
 ### 3. ติดตั้ง Package
 
 ```bash
-npm install openai dotenv express cors
+npm install openai dotenv express cors helmet express-rate-limit
 ```
 
 ---
@@ -62,8 +62,10 @@ npm install openai dotenv express cors
 สร้างไฟล์ `.env`
 
 ```env
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+OPENAI_API_KEY=YOUR_API_KEY_HERE
 ```
+
+> **หมายเหตุ:** อย่าลืมเพิ่ม `.env` ใน `.gitignore` เพื่อป้องกันไม่ให้ API Key หลุดไปยัง Repository
 
 ---
 
@@ -78,10 +80,25 @@ const express = require("express");
 const cors = require("cors");
 const OpenAI = require("openai");
 
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
+
 const app = express();
 
-app.use(cors());
-app.use(express.json());
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGIN || "http://localhost:5500",
+    methods: ["POST"],
+  })
+);
+app.use(express.json({ limit: "1kb" }));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+  })
+);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -90,6 +107,14 @@ const openai = new OpenAI({
 app.post("/chat", async (req, res) => {
   try {
     const { message } = req.body;
+
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
+      return res.status(400).json({ error: "Invalid message" });
+    }
+
+    if (message.length > 1000) {
+      return res.status(400).json({ error: "Message too long" });
+    }
 
     const response = await openai.responses.create({
       model: "gpt-5",
@@ -100,7 +125,7 @@ app.post("/chat", async (req, res) => {
       reply: response.output_text,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Chat error:", error.message);
 
     res.status(500).json({
       error: "Something went wrong",
@@ -161,10 +186,18 @@ curl -X POST http://localhost:3000/chat \
 <div id="result"></div>
 
 <script>
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 async function sendMessage() {
 
   const message =
     document.getElementById("message").value;
+
+  if (!message.trim()) return;
 
   const response = await fetch(
     "http://localhost:3000/chat",
@@ -183,8 +216,8 @@ async function sendMessage() {
 
   document.getElementById("result")
     .innerHTML += `
-      <p><b>You:</b> ${message}</p>
-      <p><b>AI:</b> ${data.reply}</p>
+      <p><b>You:</b> ${escapeHtml(message)}</p>
+      <p><b>AI:</b> ${escapeHtml(data.reply)}</p>
     `;
 }
 </script>
