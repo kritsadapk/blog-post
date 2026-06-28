@@ -78,6 +78,11 @@ const express = require("express");
 const cors = require("cors");
 const OpenAI = require("openai");
 
+if (!process.env.OPENAI_API_KEY) {
+  console.error("OPENAI_API_KEY is not set");
+  process.exit(1);
+}
+
 const app = express();
 
 app.use(cors());
@@ -91,6 +96,12 @@ app.post("/chat", async (req, res) => {
   try {
     const { message } = req.body;
 
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({
+        error: "message is required",
+      });
+    }
+
     const response = await openai.responses.create({
       model: "gpt-5",
       input: message,
@@ -100,10 +111,11 @@ app.post("/chat", async (req, res) => {
       reply: response.output_text,
     });
   } catch (error) {
-    console.error(error);
+    console.error("OpenAI API error:", error);
 
-    res.status(500).json({
-      error: "Something went wrong",
+    const status = error.status || 500;
+    res.status(status).json({
+      error: error.message || "Something went wrong",
     });
   }
 });
@@ -162,30 +174,53 @@ curl -X POST http://localhost:3000/chat \
 
 <script>
 async function sendMessage() {
+  const input =
+    document.getElementById("message");
+  const message = input.value.trim();
 
-  const message =
-    document.getElementById("message").value;
+  if (!message) return;
 
-  const response = await fetch(
-    "http://localhost:3000/chat",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        message
-      })
+  const result =
+    document.getElementById("result");
+
+  result.innerHTML += `
+    <p><b>You:</b> ${message}</p>
+  `;
+
+  try {
+    const response = await fetch(
+      "http://localhost:3000/chat",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.json()
+        .catch(() => ({}));
+      throw new Error(
+        err.error || response.statusText
+      );
     }
-  );
 
-  const data = await response.json();
+    const data = await response.json();
 
-  document.getElementById("result")
-    .innerHTML += `
-      <p><b>You:</b> ${message}</p>
+    result.innerHTML += `
       <p><b>AI:</b> ${data.reply}</p>
     `;
+  } catch (error) {
+    result.innerHTML += `
+      <p><b>Error:</b> ${error.message}</p>
+    `;
+  }
+
+  input.value = "";
 }
 </script>
 
